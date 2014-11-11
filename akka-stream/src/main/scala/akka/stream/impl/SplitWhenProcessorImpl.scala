@@ -38,7 +38,8 @@ private[akka] class SplitWhenProcessorImpl(_settings: MaterializerSettings, val 
   def serveSubstreamRest(substream: SubstreamOutput) = TransferPhase(primaryInputs.NeedsInput && substream.NeedsDemand) { () ⇒
     val elem = primaryInputs.dequeueInputElement()
     if (splitPredicate(elem)) {
-      currentSubstream.complete()
+      invalidateSubstreamOutput(currentSubstream.key)
+      //currentSubstream.complete()
       currentSubstream = null
       nextPhase(openSubstream(elem))
     } else substream.enqueueOutputElement(elem)
