@@ -344,6 +344,14 @@ object AkkaBuild extends Build {
     settings = defaultSettings ++ formatSettings ++ scaladocSettings ++ OSGi.httpCore ++ Seq(
       version := streamAndHttpVersion,
       libraryDependencies ++= Dependencies.httpCore,
+      fork in run in Test := true,
+      connectInput in run := true,
+      javaOptions ++= Seq(
+        "-agentpath:/home/johannes/git/self/perf-map-agent/libperfmap.so",
+        //"-agentlib:hprof=cpu=samples,depth=10",
+        "-XX:+PrintCompilation",
+        "-verbose:gc"
+      ),
       // FIXME include mima when akka-http-core-2.3.x is released
       //previousArtifact := akkaPreviousArtifact("akka-http-core-experimental")
       previousArtifact := None
