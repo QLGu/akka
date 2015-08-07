@@ -129,7 +129,7 @@ private[http] class HttpRequestParser(_settings: ParserSettings,
 
         val allHeaders =
           if (method == HttpMethods.GET) {
-            Handshake.isWebsocketUpgrade(headers, hostHeaderPresent) match {
+            Handshake.Server.isWebsocketUpgrade(headers, hostHeaderPresent) match {
               case Some(upgrade) ⇒ upgrade :: allHeaders0
               case None          ⇒ allHeaders0
             }

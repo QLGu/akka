@@ -5,8 +5,9 @@
 package akka.http.scaladsl
 
 import java.net.InetSocketAddress
+import java.security.SecureRandom
 import java.util.concurrent.ConcurrentHashMap
-import java.util.{ Collection ⇒ JCollection }
+import java.util.{ Collection ⇒ JCollection, Random }
 import javax.net.ssl.{ SSLContext, SSLParameters }
 
 import akka.actor._
@@ -15,8 +16,10 @@ import akka.http._
 import akka.http.impl.engine.client._
 import akka.http.impl.engine.server._
 import akka.http.impl.util.{ ReadTheDocumentationException, Java6Compat, StreamUtils }
+import akka.http.impl.engine.ws.WebsocketClientBlueprint
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.headers.Host
+import akka.http.scaladsl.model.ws.Message
 import akka.http.scaladsl.util.FastFuture
 import akka.japi
 import akka.stream.Materializer
@@ -364,6 +367,21 @@ class HttpExt(config: Config)(implicit system: ActorSystem) extends akka.actor.E
       case e: IllegalUriException ⇒ FastFuture.failed(e)
     }
 
+  def websocketClientLayer(uri: Uri,
+                           settings: ClientConnectionSettings,
+                           random: Random = new SecureRandom(),
+                           log: LoggingAdapter = system.log): Http.WebsocketClientLayer =
+    WebsocketClientBlueprint(uri, settings, random, log)
+
+  /**
+   * Returns a flow that once materialized establishes a websocket connection to the given Uri.
+   */
+  def websocketClientFlow(uri: Uri,
+                          settings: ClientConnectionSettings = ClientConnectionSettings(system),
+                          log: LoggingAdapter = system.log)(implicit fm: Materializer): Flow[Message, Message, OutgoingConnection] =
+    // TODO: see _outgoingConnection
+    ???
+
   /**
    * Triggers an orderly shutdown of all host connections pools currently maintained by the [[ActorSystem]].
    * The returned future is completed when all pools that were live at the time of this method call
@@ -519,6 +537,20 @@ object Http extends ExtensionId[HttpExt] with ExtensionIdProvider {
    */
   type ClientLayer = BidiFlow[HttpRequest, SslTlsOutbound, SslTlsInbound, HttpResponse, Unit]
   //#
+
+  /**
+   * The type of the client-side Websocket layer as a stand-alone BidiFlow
+   * that can be put atop the TCP layer to form an HTTP client.
+   *
+   * {{{
+   *                +------+
+   * ws.Message   ~>|      |~> SslTlsOutbound
+   *                | bidi |
+   * ws.Message   <~|      |<~ SslTlsInbound
+   *                +------+
+   * }}}
+   */
+  type WebsocketClientLayer = BidiFlow[Message, SslTlsOutbound, SslTlsInbound, Message, Unit]
 
   /**
    * Represents a prospective HTTP server binding.
