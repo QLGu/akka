@@ -47,10 +47,13 @@ object WSTestUtils {
     if (mask) {
       val mask = Random.nextInt()
       frameHeader(Opcode.Close, 2, fin = true, mask = Some(mask)) ++
-        maskedBytes(shortBE(closeCode), mask)._1
+        maskedBytes(closeFrameData(closeCode), mask)._1
     } else
       frameHeader(Opcode.Close, 2, fin = true) ++
-        shortBE(closeCode)
+        closeFrameData(closeCode)
+
+  def closeFrameData(closeCode: Int): ByteString =
+    shortBE(closeCode)
 
   def maskedASCII(str: String, mask: Int): (ByteString, Int) =
     FrameEventParser.mask(ByteString(str, "ASCII"), mask)
