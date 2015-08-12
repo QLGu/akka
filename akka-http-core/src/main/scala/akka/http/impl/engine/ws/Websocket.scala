@@ -27,12 +27,14 @@ import akka.http.scaladsl.model.ws._
 private[http] object Websocket {
   import FrameHandler._
 
+  import PPrintDebug.bytestringPrinter
+
   /** The lowest layer that implements the binary protocol */
   def framing: BidiFlow[ByteString, FrameEvent, FrameEvent, ByteString, Unit] =
     BidiFlow.wrap(
       Flow[ByteString].transform(() ⇒ new FrameEventParser),
       Flow[FrameEvent].transform(() ⇒ new FrameEventRenderer))(Keep.none)
-      .named("ws-framing")
+      .named("ws-framing") atop PPrintDebug.layer[FrameEvent, FrameEvent]("framing")
 
   /** The layer that handles masking using the rules defined in the specification */
   def masking(serverSide: Boolean): BidiFlow[FrameEvent, FrameEvent, FrameEvent, FrameEvent, Unit] =

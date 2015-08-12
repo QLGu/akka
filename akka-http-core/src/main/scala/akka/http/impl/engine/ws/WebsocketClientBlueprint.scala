@@ -42,6 +42,7 @@ object OneTimeValve {
     def open(): Unit = promise.success(())
   }
 }
+import PPrintDebug.bytestringPrinter
 
 object WebsocketClientBlueprint {
   def apply(uri: Uri,
@@ -49,6 +50,7 @@ object WebsocketClientBlueprint {
             random: Random,
             log: LoggingAdapter): Http.WebsocketClientLayer =
     (simpleTls atop
+      akka.http.impl.util.PPrintDebug.layer[ByteString, ByteString]("network-plaintext") atop
       handshake(uri, settings, random, log) atop
       Websocket.framing atop
       Websocket.stack(serverSide = false)).reversed
