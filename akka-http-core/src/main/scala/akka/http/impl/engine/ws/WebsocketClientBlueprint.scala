@@ -7,9 +7,12 @@ package akka.http.impl.engine.ws
 import java.security.SecureRandom
 import java.util.Random
 
-import akka.http.impl.engine.parsing.ParserOutput.{ ResponseStart, NeedMoreData }
-import akka.http.impl.engine.parsing.{ HttpHeaderParser, HttpResponseParser }
+import akka.http.impl.engine.parsing.HttpMessageParser.StateResult
+import akka.http.impl.engine.parsing.ParserOutput.{ RemainingBytes, ResponseOutput, ResponseStart, NeedMoreData }
+import akka.http.impl.engine.parsing.{ ParserOutput, HttpHeaderParser, HttpResponseParser }
 import akka.http.impl.engine.rendering.{ HttpRequestRendererFactory, RequestRenderingContext }
+import akka.http.impl.engine.ws.FrameHandler.MessageEnd
+import akka.http.impl.engine.ws.Handshake.Client.NegotiatedWebsocketSettings
 import akka.http.impl.util.PPrintDebug
 import akka.http.scaladsl.model.headers.Host
 import akka.stream.scaladsl.FlexiMerge.{ Read, MergeLogic }
@@ -26,7 +29,7 @@ import akka.stream.scaladsl._
 
 import akka.http.ClientConnectionSettings
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.{ HttpMethods, HttpMethod, Uri }
+import akka.http.scaladsl.model.{ HttpResponse, HttpMethods, HttpMethod, Uri }
 import akka.http.scaladsl.model.ws.{ TextMessage, Message }
 
 trait OneTimeValve {
@@ -70,17 +73,39 @@ object WebsocketClientBlueprint {
 
       def initial: State = parsingResponse
 
-      val parser = new HttpResponseParser(settings.parserSettings, HttpHeaderParser(settings.parserSettings)())
+      // a special version of the parser which only parses one message and then reports the remaining data
+      // if some is available
+      val parser = new HttpResponseParser(settings.parserSettings, HttpHeaderParser(settings.parserSettings)()) {
+        var first = true
+        override protected def parseMessage(input: ByteString, offset: Int): StateResult = {
+          if (first) {
+            first = false
+            super.parseMessage(input, offset)
+          } else {
+            emit(RemainingBytes(input.drop(offset)))
+            terminate()
+          }
+        }
+      }
       parser.setRequestMethodForNextResponse(HttpMethods.GET)
 
       def parsingResponse: State = new State {
         def onPush(elem: ByteString, ctx: Context[ByteString]): SyncDirective = {
           parser.onPush(elem) match {
             case NeedMoreData ⇒ ctx.pull()
-            case ResponseStart(code, protocol, headers, entity, close) ⇒
-              println("Got Response!")
+            case ResponseStart(status, protocol, headers, entity, close) ⇒
+              val response = HttpResponse(status, headers, protocol = protocol)
+              Handshake.Client.validateResponse(response, key) match {
+                case Some(NegotiatedWebsocketSettings(protocol)) ⇒
+              }
+
               become(transparent)
-              ctx.pull()
+
+              require(parser.onPull() == ParserOutput.MessageEnd)
+              parser.onPull() match {
+                case NeedMoreData          ⇒ ctx.pull()
+                case RemainingBytes(bytes) ⇒ ctx.push(bytes)
+              }
           }
         }
       }

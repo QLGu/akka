@@ -148,7 +148,7 @@ private[http] object Handshake {
       (HttpRequest(HttpMethods.GET, uri.toRelative, headers), key)
     }
 
-    def validateResponse(response: HttpResponse): Option[NegotiatedWebsocketSettings] = {
+    def validateResponse(response: HttpResponse, key: `Sec-WebSocket-Key`): Option[NegotiatedWebsocketSettings] = {
       // TODO: implement
       println(response.headers.mkString("\n"))
 

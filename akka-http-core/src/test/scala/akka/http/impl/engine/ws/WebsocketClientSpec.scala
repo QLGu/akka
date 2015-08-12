@@ -32,9 +32,33 @@ class WebsocketClientSpec extends FreeSpec with Matchers with WithMaterializerSp
     }
 
     "don't send out websocket frames before handshake was finished successfully" in {}
-    "receive first frame in same chunk as HTTP upgrade response" in {}
+    "receive first frame in same chunk as HTTP upgrade response" in new TestSetup with ClientProbes {
+      expectWireData(
+        """GET /ws HTTP/1.1
+          |Upgrade: websocket
+          |Connection: upgrade
+          |Sec-WebSocket-Key: YLQguzhR2dR6y5M9vnA5mw==
+          |Sec-WebSocket-Version: 13
+          |Host: example.org
+          |User-Agent: akka-http/test
+          |
+          |""".stripMarginWithNewline("\r\n"))
 
-    "manual scenario" in new EstablishedConnectionSetup with ClientProbes {
+      val firstFrame = WSTestUtils.frame(Protocol.Opcode.Text, ByteString("fast"), fin = true, mask = false)
+      sendWireData(ByteString(
+        """HTTP/1.1 101 Switching Protocols
+          |Upgrade: websocket
+          |Sec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzzhZRbK+xOo=
+          |Server: akka-http/test
+          |Connection: upgrade
+          |
+          |""".stripMarginWithNewline("\r\n")) ++ firstFrame)
+
+      messagesInSub.request(1)
+      messagesIn.expectNext(TextMessage("fast"))
+    }
+
+    "manual scenario client sends first" in new EstablishedConnectionSetup with ClientProbes {
       netOutSub.request(10)
 
       messagesOutSub.sendNext(TextMessage("Message 1"))
