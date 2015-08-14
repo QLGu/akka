@@ -34,7 +34,7 @@ private[http] object Websocket {
     BidiFlow.wrap(
       Flow[ByteString].transform(() ⇒ new FrameEventParser),
       Flow[FrameEvent].transform(() ⇒ new FrameEventRenderer))(Keep.none)
-      .named("ws-framing") atop PPrintDebug.layer[FrameEvent, FrameEvent]("framing")
+      .named("ws-framing")
 
   /** The layer that handles masking using the rules defined in the specification */
   def masking(serverSide: Boolean): BidiFlow[FrameEvent, FrameEvent, FrameEvent, FrameEvent, Unit] =
@@ -79,6 +79,7 @@ private[http] object Websocket {
     val collectMessage: Flow[Source[MessageDataPart, Unit], Message, Unit] =
       Flow[Source[MessageDataPart, Unit]]
         .via(headAndTailFlow)
+        .via(PPrintDebug.flow("headAndTail-out"))
         .map {
           case (TextMessagePart(text, true), remaining) ⇒
             TextMessage.Strict(text)
@@ -179,12 +180,17 @@ private[http] object Websocket {
 
     def prepareMessages: Flow[MessagePart, Message, Unit] =
       Flow[MessagePart]
+        .via(PPrintDebug.flow("prep-in"))
         .transform(() ⇒ new PrepareForUserHandler)
+        .via(PPrintDebug.flow("prep-out"))
         .splitWhen(_.isMessageEnd) // FIXME using splitAfter from #16885 would simplify protocol a lot
+        .via(PPrintDebug.flow("split-out"))
         .map(_.collect {
           case m: MessageDataPart ⇒ m
         })
+        .via(PPrintDebug.flow("collect-in"))
         .via(collectMessage)
+        .via(PPrintDebug.flow[Message]("collect-out"))
         .named("ws-prepare-messages")
 
     def renderMessages: Flow[Message, FrameStart, Unit] =
@@ -223,9 +229,9 @@ private[http] object Websocket {
 
   def stack(serverSide: Boolean = true,
             closeTimeout: FiniteDuration = 3.seconds): BidiFlow[FrameEvent, Message, Message, FrameEvent, Unit] =
-    masking(serverSide) atop
-      frameHandling(serverSide, closeTimeout) atop
-      messageAPI(serverSide, closeTimeout)
+    masking(serverSide) atop PPrintDebug.layer[FrameEvent, FrameEvent]("framing") atop
+      frameHandling(serverSide, closeTimeout) atop PPrintDebug.layer[Either[BypassEvent, MessagePart], FrameOutHandler.Input]("handling") atop
+      messageAPI(serverSide, closeTimeout) atop PPrintDebug.layer[Message, Message]("message")
 
   object Tick
   case object SwitchToWebsocketToken

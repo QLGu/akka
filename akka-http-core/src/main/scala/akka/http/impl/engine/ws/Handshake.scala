@@ -149,6 +149,10 @@ private[http] object Handshake {
     }
 
     def validateResponse(response: HttpResponse, key: `Sec-WebSocket-Key`): Option[NegotiatedWebsocketSettings] = {
+      def expect[T](what: T, toBe: T, name: String): Unit =
+        require(what == toBe, s"$name should have been $toBe but was $what")
+
+      expect(response.status, StatusCodes.SwitchingProtocols, "status code")
       // TODO: implement
       println(response.headers.mkString("\n"))
 

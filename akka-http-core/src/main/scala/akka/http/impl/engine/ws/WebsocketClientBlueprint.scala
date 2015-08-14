@@ -101,7 +101,8 @@ object WebsocketClientBlueprint {
 
               become(transparent)
 
-              require(parser.onPull() == ParserOutput.MessageEnd)
+              val parseResult = parser.onPull()
+              require(parseResult == ParserOutput.MessageEnd, s"parseResult should be MessageEnd but was $parseResult")
               parser.onPull() match {
                 case NeedMoreData          ⇒ ctx.pull()
                 case RemainingBytes(bytes) ⇒ ctx.push(bytes)

@@ -51,8 +51,8 @@ private[http] object Masking {
       def onPush(part: FrameEvent, ctx: Context[FrameEvent]): SyncDirective =
         part match {
           case start @ FrameStart(header, data) ⇒
-            if (header.length == 0) ctx.push(part)
-            else {
+            /*if (header.length == 0) ctx.push(part)
+            else */ {
               val mask = extractMask(header)
               become(new Running(mask))
               current.onPush(start.copy(header = setNewMask(header, mask)), ctx)

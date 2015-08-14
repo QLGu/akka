@@ -6,12 +6,14 @@ package akka.http.impl.engine.ws
 
 import java.util.Random
 
+import akka.actor.ActorSystem
 import akka.http.ClientConnectionSettings
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.headers.{ ProductVersion, `User-Agent` }
 import akka.http.scaladsl.model.ws._
 import akka.http.scaladsl.model.Uri
-import akka.stream.io.{ SendBytes, SslTlsOutbound, SessionBytes }
+import akka.stream.ActorMaterializer
+import akka.stream.io._
 import akka.stream.scaladsl._
 import akka.stream.testkit.{ TestSubscriber, TestPublisher }
 import akka.util.ByteString
@@ -181,4 +183,24 @@ class WebsocketClientSpec extends FreeSpec with Matchers with WithMaterializerSp
     override def clientImplementation: Flow[Message, Message, Unit] =
       Flow.wrap(Sink(messagesIn), Source(messagesOut))(Keep.none)
   }
+}
+
+object WebsocketClientTest extends App {
+  implicit val system = ActorSystem()
+  implicit val mat = ActorMaterializer()
+
+  def runCase(caseId: Int): Unit = {
+    val caseUri = Uri(s"ws://localhost:9001/runCase?case=$caseId&agent=akka-http")
+
+    val tcp = Tcp().outgoingConnection("localhost", 9001)
+    val ws = Http(system).websocketClientLayer(caseUri, ClientConnectionSettings(system))
+
+    val wsClient = ws atop SslTlsPlacebo.forScala join tcp
+    wsClient.join(Flow[Message].via(PPrintDebug.flow("user"))).run()
+  }
+
+  (1 to 1) foreach runCase
+  import scala.concurrent.duration._
+  import system.dispatcher
+  system.scheduler.scheduleOnce(10.seconds)(system.shutdown())
 }

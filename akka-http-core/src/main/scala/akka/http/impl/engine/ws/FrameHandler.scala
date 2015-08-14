@@ -96,6 +96,7 @@ private[http] object FrameHandler {
     }
 
     def handleControlFrame(opcode: Opcode, data: ByteString, nextState: State)(implicit ctx: Ctx): SyncDirective = {
+      Thread.sleep(100)
       become(nextState)
       opcode match {
         case Opcode.Ping ⇒ publishDirectResponse(FrameEvent.fullFrame(Opcode.Pong, None, data, fin = true))
