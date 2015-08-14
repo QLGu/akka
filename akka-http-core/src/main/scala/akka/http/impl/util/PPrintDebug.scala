@@ -18,8 +18,9 @@ object PPrintDebug {
   implicit def bytestringPrinter: PPrinter[ByteString] =
     PPrinter[ByteString] { (bs: ByteString, c: Config) ⇒
       val maxBytes = 16 * 5
-      val utf8 = Charset.forName("utf8")
-      def formatBytes(bs: ByteString): String = {
+      val indent = " " * (c.indent + 1)
+
+      def formatBytes(bs: ByteString): Iterator[String] = {
         def asHex(b: Byte): String = b formatted "%02X"
         def asASCII(b: Byte): Char =
           if (b >= 0x20 && b < 0x7f) b.toChar
@@ -27,18 +28,25 @@ object PPrintDebug {
 
         def formatLine(bs: ByteString): String = {
           val data = bs.toSeq
-          val indent = " " * (c.indent + 1)
           val hex = data.map(asHex).mkString(" ")
           val ascii = data.map(asASCII).mkString
-          f"$indent%s$hex%-48s | $ascii"
+          f"$indent%s  $hex%-48s | $ascii"
         }
+        def formatBytes(bs: ByteString): String =
+          bs.grouped(16).map(formatLine).mkString("\n")
 
-        val first = bs.take(maxBytes).grouped(16)
-        s"ByteString(${bs.size} bytes) first $maxBytes bytes:\n" +
-          first.map(formatLine).mkString("\n")
+        val prefix = s"${indent}ByteString(${bs.size} bytes)"
+
+        if (bs.size < maxBytes * 2) Iterator(prefix + "\n", formatBytes(bs))
+        else
+          Iterator(
+            s"$prefix first + last $maxBytes:\n",
+            formatBytes(bs.take(maxBytes)),
+            s"\n$indent...\n",
+            formatBytes(bs.takeRight(maxBytes)))
       }
 
-      Iterator(formatBytes(bs))
+      formatBytes(bs)
     }
 
   def layer[L: PPrint, R: PPrint](tag: String): BidiFlow[L, L, R, R, Unit] =
@@ -46,8 +54,10 @@ object PPrintDebug {
 
   private[http] def flow[T: PPrint](marker: String): Flow[T, T, Unit] =
     Flow[T].transform(() ⇒ new PushPullStage[T, T] {
+      def println(str: String): Unit = scala.Console.println(str)
+
       override def onPush(element: T, ctx: Context[T]): SyncDirective = {
-        println(s"$marker: ${formatElement(element)}")
+        println(s"$marker: PUSH\n${formatElement(element)}")
         ctx.push(element)
       }
       override def onPull(ctx: Context[T]): SyncDirective = {
@@ -68,6 +78,6 @@ object PPrintDebug {
       }
 
       def formatElement(element: T): String =
-        pprint.tokenize(element, width = 80, height = 10, colors = Colors.Colored).mkString
+        pprint.tokenize(element, width = 80, height = 14, colors = Colors.Colored).mkString
     })
 }
