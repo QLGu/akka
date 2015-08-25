@@ -8,6 +8,7 @@ import scala.concurrent.duration._
 import scala.concurrent.Await
 import akka.actor.ActorSystem
 import akka.http.scaladsl.model._
+import headers.Cookie
 import akka.http.scaladsl.model.ws._
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{ Source, Flow }
@@ -37,6 +38,11 @@ object TestServer extends App {
           case Some(upgrade) ⇒ upgrade.handleMessages(greeterWebsocketService)
           case None          ⇒ HttpResponse(400, entity = "Not a valid websocket request!")
         }
+      case req @ HttpRequest(GET, Uri.Path("/cookies"), _, _, _) ⇒
+        val text = s"Cookies: ${req.header[Cookie].map(_.cookies.map("'" + _ + "'").mkString(", "))}"
+        val setA = headers.RawHeader("Set-Cookie", "c=def,ghi=jkl")
+        HttpResponse(entity = text, headers = setA :: Nil)
+
       case _: HttpRequest ⇒ HttpResponse(404, entity = "Unknown resource!")
     }, interface = "localhost", port = 9001)
 

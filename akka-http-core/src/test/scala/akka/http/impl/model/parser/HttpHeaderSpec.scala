@@ -220,10 +220,15 @@ class HttpHeaderSpec extends FreeSpec with Matchers {
     "Cookie" in {
       "Cookie: SID=31d4d96e407aad42" =!= Cookie("SID" -> "31d4d96e407aad42")
       "Cookie: SID=31d4d96e407aad42; lang=en>US" =!= Cookie("SID" -> "31d4d96e407aad42", "lang" -> "en>US")
+      "Cookie: a=1; b=2" =!= Cookie("a" -> "1", "b" -> "2")
       "Cookie: a=1;b=2" =!= Cookie("a" -> "1", "b" -> "2").renderedTo("a=1; b=2")
       "Cookie: a=1 ;b=2" =!= Cookie("a" -> "1", "b" -> "2").renderedTo("a=1; b=2")
-      "Cookie: a=1; b=2" =!= Cookie("a" -> "1", "b" -> "2")
-      "Cookie: a=1,b=2" =!= Cookie("a" -> "1", "b" -> "2").renderedTo("a=1; b=2")
+
+      "Cookie: z=0;a=1,b=2" =!= Cookie("z" -> "0").renderedTo("z=0") // with lax parsing: also "a" -> "1,b=2"
+      """Cookie: a=1;b="test"""" =!= Cookie("a" -> "1", "b" -> "test").renderedTo("a=1; b=test") // in lax parsing mode: don't remove the quotes?
+
+      "Cookie: a=1; b=f\"d\"c\"; c=xyz" =!= Cookie("a" -> "1", "c" -> "xyz").renderedTo("a=1; c=xyz") // with lax parsing: Cookie("a" -> "1", "b" -> "f\"d\"c\"", "c" -> "xyz")
+      "Cookie: a=1; b=ä; c=d" =!= Cookie("a" -> "1", "c" -> "d").renderedTo("a=1; c=d") // with lax parsing and UTF8 parsing support: also b=ä
     }
 
     "Date" in {

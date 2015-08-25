@@ -95,7 +95,7 @@ private[parser] trait SimpleHeaders { this: Parser with CommonRules with CommonA
 
   // https://tools.ietf.org/html/rfc6265#section-4.2
   def `cookie` = rule {
-    oneOrMore(`cookie-pair`).separatedBy((ch(';') | ch(',')) ~ OWS) ~ EOI ~> (`Cookie`(_))
+    oneOrMore(`optional-cookie-pair`).separatedBy(';' ~ OWS) ~ EOI ~> (pairs ⇒ `Cookie`(pairs.collect { case Some(p) ⇒ p }))
   }
 
   // http://tools.ietf.org/html/rfc7231#section-7.1.1.2

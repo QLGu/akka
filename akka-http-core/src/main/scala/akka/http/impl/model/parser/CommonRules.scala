@@ -215,17 +215,53 @@ private[parser] trait CommonRules { this: Parser with StringBuilding ⇒
     `challenge-or-credentials` ~> ((scheme, params) ⇒ GenericHttpCredentials(scheme, params.toMap))
   }
 
-  // ******************************************************************************************
-  // https://tools.ietf.org/html/rfc6265#section-4.1.1
-  // ******************************************************************************************
-  def `cookie-pair` = rule {
+  /** A cookie-pair as defined by the configured cookie parsing mode */
+  //def `cookie-pair`: Rule1[HttpCookiePair]
+
+  //lazy val rawCookieCharacters =
+  /**
+   * Either `Some(cookiePair)` if the cookie pair is parsable using the giving cookie parsing mode
+   * or None, otherwise.
+   */
+  def `optional-cookie-pair`: Rule1[Option[HttpCookiePair]] = rule {
+    /*`cookie-pair` ~> (Some(_: HttpCookiePair)) |
+      (VCHAR -- ";\r\n" -- EOI) ~ push(None)*/
+    (`cookie-pair` ~> (Some(_))) |
+      (`cookie-name` ~ ws('=') ~ zeroOrMore((VCHAR -- ";\r\n" -- EOI)) ~> ((_: String) ⇒ None))
+  }
+
+  /*def validCookieContent: Rule1[Option[HttpCookiePair]] = rule {
+    `cookie-pair` ~> (Some(_: HttpCookiePair))
+  }
+  def anyCookieContent: Rule1[Option[HttpCookiePair]] = rule {
+
+  }*/
+
+  def `cookie-pair`: Rule1[HttpCookiePair] = rule {
     `cookie-name` ~ ws('=') ~ `cookie-value` ~> (HttpCookiePair(_: String, _: String))
   }
 
+  def `cookie-value`: Rule1[String]
+
+  /*def `cookie-pair-rfc-6265` = rule {
+    `cookie-name` ~ ws('=') ~ `cookie-value-rfc-6265` ~> (HttpCookiePair(_: String, _: String))
+  }
+*/
   def `cookie-name` = rule { token }
 
-  def `cookie-value` = rule {
-    ('"' ~ capture(zeroOrMore(`cookie-octet`)) ~ '"' | capture(zeroOrMore(`cookie-octet`))) ~ OWS
+  // ******************************************************************************************
+  // https://tools.ietf.org/html/rfc6265#section-4.1.1
+  // ******************************************************************************************
+  def `cookie-value-rfc-6265` = rule {
+    ('"' ~ capture(zeroOrMore(`cookie-octet-rfc-6265`)) ~ '"' | capture(zeroOrMore(`cookie-octet-rfc-6265`))) ~ OWS
+  }
+
+  /*def `cookie-pair-raw` = rule {
+    `cookie-name` ~ ws('=') ~ `cookie-value-raw` ~> (HttpCookiePair(_: String, _: String))
+  }*/
+
+  def `cookie-value-raw` = rule {
+    capture(zeroOrMore(`cookie-octet-raw`)) ~ OWS
   }
 
   def `cookie-av` = rule {
